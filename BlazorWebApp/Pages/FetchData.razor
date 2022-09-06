@@ -1,0 +1,71 @@
+﻿@page "/fetchdata"
+@implements IDisposable
+@inject ILogger<FetchData> Logger
+@inject IJSRuntime JS
+@inject Firebase Firebase
+
+<PageTitle>Weather forecast</PageTitle>
+
+<h1>Weather forecast</h1>
+
+<p>This component demonstrates fetching data from the server.</p>
+
+@if (forecasts == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Temp. (C)</th>
+                <th>Temp. (F)</th>
+                <th>Summary</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var key in forecasts.Keys)
+            {
+                <tr>
+                    <td>@forecasts[key].Date.ToShortDateString()</td>
+                    <td>@forecasts[key].TemperatureC</td>
+                    <td>@forecasts[key].TemperatureF</td>
+                    <td>@forecasts[key].Summary</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private DotNetObjectReference<FetchData>? objRef;
+    private Dictionary<string, WeatherForecast>? forecasts;
+    protected override async Task OnInitializedAsync()
+    {
+        objRef = DotNetObjectReference.Create(this);
+        // ผูก event onValue ของ weathers ให้เรียกมาที่ this.UpdateWeathers
+        Firebase.AttachOnValue<FetchData, Dictionary<string, WeatherForecast>>("weathers", objRef, UpdateWeathers);
+        forecasts = await Firebase.Get<Dictionary<string, WeatherForecast>>("weathers");
+    }
+
+    public void Dispose()
+    {
+        if (objRef is not null)
+        {
+            // ถอด event onValue ของ weathers ออก
+            Firebase.DetachOnValue<FetchData>("weathers", objRef);
+            objRef = null;
+        }
+        GC.SuppressFinalize(this);
+    }
+
+    [JSInvokable]
+    public void UpdateWeathers(Dictionary<string, WeatherForecast> newweathers)
+    {
+        forecasts = newweathers;
+        StateHasChanged();
+        Logger.LogInformation("Update data.");
+    }
+}

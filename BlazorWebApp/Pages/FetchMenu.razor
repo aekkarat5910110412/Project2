@@ -1,0 +1,73 @@
+﻿@page "/fetchmenu"
+@implements IDisposable
+@inject ILogger<FetchMenu> Logger
+@inject IJSRuntime JS
+@inject Firebase Firebase
+
+<PageTitle>Menu</PageTitle>
+
+<h1>Menu</h1>
+
+<p>This component demonstrates fetching data from the server.</p>
+
+@if (menu == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Name</th>
+                <th>Size</th>
+                <th>Price</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var key in menu.Keys)
+            {
+                <tr>
+                    <td>@menu[key].Date.ToShortDateString()</td>
+                    <td>@menu[key].Name</td>
+                    <td>@menu[key].Size</td>
+                    <td>@menu[key].Price</td>
+                    <td>@menu[key].Description</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private DotNetObjectReference<FetchMenu>? objRef;
+    private Dictionary<string, Menu>? menu;
+    protected override async Task OnInitializedAsync()
+    {
+        objRef = DotNetObjectReference.Create(this);
+        // ผูก event onValue ของ weathers ให้เรียกมาที่ this.UpdateWeathers
+        Firebase.AttachOnValue<FetchMenu, Dictionary<string, Menu>>("menus", objRef, UpdateMenus);
+        menu = await Firebase.Get<Dictionary<string, Menu>>("menus");
+    }
+
+    public void Dispose()
+    {
+        if (objRef is not null)
+        {
+            // ถอด event onValue ของ weathers ออก
+            Firebase.DetachOnValue<FetchMenu>("menus", objRef);
+            objRef = null;
+        }
+        GC.SuppressFinalize(this);
+    }
+
+    [JSInvokable]
+    public void UpdateMenus(Dictionary<string, Menu> newmenus)
+    {
+        menu = newmenus;
+        StateHasChanged();
+        Logger.LogInformation("Update data.");
+    }
+}

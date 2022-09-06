@@ -1,0 +1,87 @@
+﻿@page "/editmenu"
+@inject ILogger<EditMenu> Logger
+@inject Firebase Firebase
+
+<h3>Edit Menu</h3>
+<EditForm Model="@editModel" OnValidSubmit="@HandleValidSubmit" >
+    Select:
+    <InputSelect @bind-Value="@SelectedKey" DisplayName="Key">
+        @{
+            int count = 1;
+            @foreach (var key in menu.Keys)
+            {
+                <option value="@key">@count</option>
+                count++;
+            }
+        }
+    </InputSelect>
+    <DataAnnotationsValidator /> @* ตัว Validator ที่ระบุใน Annotation *@
+    <ValidationSummary  /> @* แสดงข้อความผลการ Validate *@
+    <table>
+        <tr>
+            <td>Date: </td><td><InputDate id="date" @bind-Value="editModel.Date" /></td>
+        </tr>
+        <tr>
+            <td>Name: </td><td><InputText id="name" @bind-Value="editModel.Name" /></td>
+        </tr>
+        <tr>
+            <td>Size: </td><td><InputText id="size" @bind-Value="editModel.Size" /></td>
+        </tr>
+        <tr>
+            <td>:Price: </td><td><InputNumber id="price" @bind-Value="editModel.Price" /></td>
+        </tr>
+        <tr>
+            <td>Description: </td><td><InputText id="description" @bind-Value="editModel.Description" /></td>
+        </tr>
+       
+    </table>
+    <button type="button" @onclick="AddData">Add</button>
+    <button type="submit">Update</button>
+    <button type="button" @onclick="DeleteData">Delete</button>
+</EditForm>
+
+@code {
+    private DotNetObjectReference<EditMenu>? objRef;
+    private Dictionary<string, Menu> menu = new();
+    private Menu editModel = new();
+    private string _selectedKey;
+    private string SelectedKey
+    {
+        get => _selectedKey;
+        set
+        {
+            _selectedKey = value;
+            editModel = menu[_selectedKey];
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        objRef = DotNetObjectReference.Create(this);
+        menu = await Firebase.Get<Dictionary<string, Menu>>("menus");
+        if (menu.Count > 0)
+        {
+            editModel = menu.First().Value;
+        }
+    }
+
+    private void HandleValidSubmit()
+    {
+        Firebase.Set<Dictionary<string, Menu>>("menus", menu);
+    }
+
+    private async void AddData()
+    {
+        var newKey = await Firebase.Push<Menu>("menus", editModel);
+        Logger.LogInformation("AddNewData: " + newKey);
+    }
+
+    private async void DeleteData()
+    {
+        var dataPath = Path.Combine("menus", SelectedKey);
+        Firebase.Remove(dataPath);
+        menu.Remove(SelectedKey);
+        SelectedKey = menu.First().Key;
+        Logger.LogInformation("Delete: " + dataPath);
+    }
+}

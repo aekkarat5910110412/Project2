@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>BlazorWebApp</title>
+    <base href="/" />
+    <link href="css/bootstrap/bootstrap.min.css" rel="stylesheet" />
+    <link href="css/app.css" rel="stylesheet" />
+    <link href="BlazorWebApp.styles.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app">Loading...</div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.3/firebase-app.js";
+        import {
+            getDatabase,
+            ref,
+            child, query, orderByChild, orderByKey, orderByValue,
+            get, set, push, remove, update,
+            onValue
+        } from "https://www.gstatic.com/firebasejs/9.6.3/firebase-database.js";
+
+        // เพิ่มเติม SDKs อื่นๆของ Firebase ได้ตามต้องการจากลิ้งค์
+        // https://firebase.google.com/docs/web/learn-more#libraries-cdn
+
+        // Your web app's Firebase configuration
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        const firebaseConfig = {
+            apiKey: "AIzaSyA4LIDUjp1iL6PKQeyV0v7oGPa3x4lMwKU",
+            authDomain: "project-res-bf54d.firebaseapp.com",
+            databaseURL: "https://project-res-bf54d-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "project-res-bf54d",
+            storageBucket: "project-res-bf54d.appspot.com",
+            messagingSenderId: "738785147323",
+            appId: "1:738785147323:web:37d458d69853d2e8b5ec9e",
+            measurementId: "G-9PVSNS5KXS"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        // Get a reference to the database service
+        const database = getDatabase(app);
+        if (database) {
+            console.log("Get database success.");
+        }
+        else {
+            console.log("Get database fail.");
+        }
+
+        window.EnsureCreated = async (initData) => {
+            let rootRef = ref(database);
+            let initKeys = Object.keys(initData);
+            return await get(rootRef)
+                .then((snapshot) => {
+                    let rootData = {};
+                    if (snapshot.exists()) {
+                        rootData = snapshot.val();
+                        let childKeys = Object.keys(rootData);
+                        for (let key of initKeys) {
+                            if (!childKeys.find((k) => k == key)) {
+                                rootData[key] = initData[key];
+                                console.log("Initialize: " + key);
+                            }
+                        }
+                    } else {
+                        rootData = initData;
+                        console.log("Initialize: " + JSON.stringify(initKeys));
+                    }
+                    update(rootRef, rootData);
+                }).catch((error) => {
+                    console.error(error);
+                });
+        }
+
+        // ฟังก์ชันสำหรับจัดการข้อมูล CRUD (Create, Read, Update, Delete)
+        // Create => PushData
+        // Read => GetData
+        // Update => SetData
+        // Delete => RevmoeData
+
+        window.PushData = async (parentpath, initValue) => {
+            let parentRef = ref(database, parentpath);
+            let newRef = await push(parentRef, initValue);
+            if (newRef) {
+                return newRef.key;
+            } else {
+                return undefined;
+            }
+        };
+
+        window.GetData = async (datapath) => {
+            let dataRef = ref(database, datapath);
+            let snapshot = await get(dataRef);
+            return snapshot.exists() ? snapshot.val() : null;
+        };
+
+        window.SetData = async (datapath, value) => {
+            let dataRef = ref(database, datapath);
+            await set(dataRef, value);
+        };
+
+        window.RemoveData = async (datapath) => {
+            let dataRef = ref(database, datapath);
+            console.log("Remove Key: " + dataRef.key);
+            await remove(dataRef);
+        };
+
+        // สำหรับเก็บค่า Unsubscribed ฟังก์ชันที่ return จาก onValue() เพื่อไว้ใช้สำหรับยกเลิก callback
+        const onValueMap = new Map();
+
+        // ผูก objRef.callback() ฟังก์ชันไว้กับ event onValue ของ datapath
+        // เมื่อข้อมูลที่ datapath เปลี่ยนแปลง ก็จะเรียกไปยัง objRef.callback(snapshot.val())
+        window.AttachOnValue = async (datapath, objRef, callback) => {
+            let dataRef = ref(database, datapath);
+            let unsubscribe = onValue(dataRef, async (snapshot) => {
+                if (snapshot.exists()) {
+                    await objRef.invokeMethodAsync(callback, snapshot.val());
+                } else {
+                    await objRef.invokeMethodAsync(callback, null);
+                }
+            });
+            onValueMap.set(objRef._id, unsubscribe);
+        };
+
+        // ถอด callback ฟังก์ชันที่ผูกไว้กับ event onValue ของ datapath ออกทั้งหมด
+        window.DetachOnValue = async (datapath, objRef) => {
+            let dataRef = ref(database, datapath);
+            let unsubscribe = onValueMap.get(objRef._id);
+            if (unsubscribe !== undefined) {
+                unsubscribe();
+                onValueMap.delete(objRef._id);
+            }
+        }
+    </script>
+</body>
+
+</html>

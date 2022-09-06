@@ -1,0 +1,80 @@
+﻿@page "/editdata"
+@inject ILogger<EditData> Logger
+@inject Firebase Firebase
+
+<h3>Edit Data</h3>
+<EditForm Model="@editModel" OnValidSubmit="@HandleValidSubmit" >
+    Select:
+    <InputSelect @bind-Value="@SelectedKey" DisplayName="Key">
+        @{
+            int count = 1;
+            @foreach (var key in forecasts.Keys)
+            {
+                <option value="@key">@count</option>
+                count++;
+            }
+        }
+    </InputSelect>
+    <DataAnnotationsValidator /> @* ตัว Validator ที่ระบุใน Annotation *@
+    <ValidationSummary  /> @* แสดงข้อความผลการ Validate *@
+    <table>
+        <tr>
+            <td>Date: </td><td><InputDate id="date" @bind-Value="editModel.Date" /></td>
+        </tr>
+        <tr>
+            <td>Temperature: </td><td><InputNumber id="temperature" @bind-Value="editModel.TemperatureC" /></td>
+        </tr>
+        <tr>
+            <td>Summary: </td><td><InputText id="summary" @bind-Value="editModel.Summary" /></td>
+        </tr>
+    </table>
+    <button type="button" @onclick="AddData">Add</button>
+    <button type="submit">Update</button>
+    <button type="button" @onclick="DeleteData">Delete</button>
+</EditForm>
+
+@code {
+    private DotNetObjectReference<EditData>? objRef;
+    private Dictionary<string, WeatherForecast> forecasts = new();
+    private WeatherForecast editModel = new();
+    private string _selectedKey;
+    private string SelectedKey
+    {
+        get => _selectedKey;
+        set
+        {
+            _selectedKey = value;
+            editModel = forecasts[_selectedKey];
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        objRef = DotNetObjectReference.Create(this);
+        forecasts = await Firebase.Get<Dictionary<string, WeatherForecast>>("weathers");
+        if (forecasts.Count > 0)
+        {
+            editModel = forecasts.First().Value;
+        }
+    }
+
+    private void HandleValidSubmit()
+    {
+        Firebase.Set<Dictionary<string, WeatherForecast>>("weathers", forecasts);
+    }
+
+    private async void AddData()
+    {
+        var newKey = await Firebase.Push<WeatherForecast>("weathers", editModel);
+        Logger.LogInformation("AddNewData: " + newKey);
+    }
+
+    private async void DeleteData()
+    {
+        var dataPath = Path.Combine("weathers", SelectedKey);
+        Firebase.Remove(dataPath);
+        forecasts.Remove(SelectedKey);
+        SelectedKey = forecasts.First().Key;
+        Logger.LogInformation("Delete: " + dataPath);
+    }
+}
