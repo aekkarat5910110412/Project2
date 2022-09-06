@@ -19,6 +19,7 @@ namespace BlazorWebApp.Models
  
         public string? Size { get; set; }
 
+        [Required(ErrorMessage = "Description: Cannot be empty.")]
         public string? Description { get; set; }
 
 
